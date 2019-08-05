@@ -86,7 +86,7 @@ class colors:
 # Parameters for the model and dataset.
 TRAINING_SIZE = 50000
 MAX_WORD_LENGTH = 5
-REVERSE = True
+REVERSE = False
 
 # Maximum length of input should correspond to the max of all lines in a given file.
 MAXLEN = 15
@@ -95,37 +95,40 @@ MAXLEN = 15
 chars = string.printable
 ctable = CharacterTable(chars)
 
-questions = []
-expected = []
-seen = set()
+def generate_words():
+    questions = []
+    expected = []
+    while len(questions) < TRAINING_SIZE:
+        word = lambda: ''.join(np.random.choice(list(string.ascii_letters + string.digits))
+                    for i in range(np.random.randint(1, MAX_WORD_LENGTH + 1)))
+
+        separator = lambda: ''.join(np.random.choice(list(string.punctuation + ' '))
+                    for i in range(np.random.randint(1, 3)))
+
+        translator = str.maketrans(string.punctuation, ' '*len(string.punctuation)) #map punctuation to space
+
+        line = word()
+        while len(line) < MAXLEN:
+            line = line + separator() + word()
+        
+        if len(line) > MAXLEN:
+            line = line[:MAXLEN]
+
+        query = line
+
+        ans = line.translate(translator)
+
+        if REVERSE:
+            # Reverse the query, e.g., '12+345  ' becomes '  543+21'. (Note the
+            # space used for padding.)
+            query = query[::-1]
+        questions.append(query)
+        expected.append(ans)
+    print('Total addition questions:', len(questions))
+    return questions, expected
+
 print('Generating data...')
-while len(questions) < TRAINING_SIZE:
-    word = lambda: ''.join(np.random.choice(list(string.ascii_letters + string.digits))
-                for i in range(np.random.randint(1, MAX_WORD_LENGTH + 1)))
-
-    separator = lambda: ''.join(np.random.choice(list(string.punctuation + ' '))
-                for i in range(np.random.randint(1, 3)))
-
-    translator = str.maketrans(string.punctuation, ' '*len(string.punctuation)) #map punctuation to space
-
-    line = word()
-    while len(line) < MAXLEN:
-        line = line + separator() + word()
-    
-    if len(line) > MAXLEN:
-        line = line[:MAXLEN]
-
-    query = line
-
-    ans = line.translate(translator)
-
-    if REVERSE:
-        # Reverse the query, e.g., '12+345  ' becomes '  543+21'. (Note the
-        # space used for padding.)
-        query = query[::-1]
-    questions.append(query)
-    expected.append(ans)
-print('Total addition questions:', len(questions))
+questions, expected = generate_words()
 
 print('Vectorization...')
 x = np.zeros((len(questions), MAXLEN, len(chars)), dtype=np.bool)
@@ -192,14 +195,14 @@ def model_rnn():
 def model_ff():
     print('Build model...')
     model = Sequential()
-    model.add(layers.Dense(MAXLEN * len(chars), input_shape=(MAXLEN, len(chars))))
-    model.add(layers.Dense(750, activation='sigmoid'))
-    model.add(layers.Dense(375, activation='sigmoid'))
+    model.add(layers.Dense(len(chars), input_shape=(MAXLEN, len(chars))))
+    model.add(layers.Dense(len(chars), activation='sigmoid'))
+    model.add(layers.Dense(len(chars), activation='sigmoid'))
     model.add(layers.Dense(len(chars), activation='softmax'))
     model.compile(loss='categorical_crossentropy',
                 optimizer='adam',
                 metrics=['accuracy'])
-    return model, 'ff2.h5'
+    return model, 'ff4.h5'
 
 model, name = model_ff()
 model.summary()
