@@ -17,7 +17,7 @@ from six.moves import range
 import string, re, collections
 
 VOCAB_SIZE = 100
-SAMPLE_SIZE = 100
+SAMPLE_SIZE = 50
 TOP = 2
 
 class WordTable(object):
@@ -38,6 +38,9 @@ class WordTable(object):
         self.words = list(set([w for w in self.all_words if w not in stopwords]))
         self.word_indices = dict((w, i) for i, w in enumerate(self.words))
         self.indices_word = dict((i, w) for i, w in enumerate(self.words))
+
+    def drop(self):
+        self.all_words = self.words = []
 
     def encode(self, W):
         """One-hot encode given word, or list of indices, W.
@@ -70,6 +73,7 @@ class WordTable(object):
         """
         if x.ndim == 1: # either a single word, one-hot encoded, or multiple words
             one_idxs = [i for i, v in enumerate(x) if v >= 0.5]
+            #one_idxs = np.argpartition(a, -TOP)[-TOP:]
             return [self.indices_word[i] for i in one_idxs]
         elif x.ndim == 2: # a list of words, each one-hot encoded
             words = []
@@ -85,7 +89,7 @@ ctable = WordTable('pride-and-prejudice.txt')
 # Parameters for the model and dataset.
 TRAINING_SIZE = 50000
 
-def generate_integer_list():
+def generate_data():
     questions = []
     expected = []
     for _ in range(0, TRAINING_SIZE):
@@ -115,7 +119,7 @@ def generate_integer_list():
     return questions, expected
 
 print('Generating data...')
-questions, expected = generate_integer_list()
+questions, expected = generate_data()
 
 print('Vectorization...')
 x = np.zeros((len(questions), SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int)
@@ -189,7 +193,7 @@ for iteration in range(1, epochs):
         ind = np.random.randint(0, len(x_val))
         rowx, rowy = x_val[np.array([ind])], y_val[np.array([ind])]
         preds = model.predict(rowx, verbose=0)
-        print(preds)
+#        print(preds)
 #        preds[preds>=0.5] = 1
 #        preds[preds<0.5] = 0
 
@@ -197,7 +201,6 @@ for iteration in range(1, epochs):
         correct = ctable.decode(rowy[0])
         guess = ctable.decode(preds[0])
         print('T', correct, '    G', guess)
-        print('G_count ', sum(v >= 0.5 for v in preds[0]), ' Guess_count ', len(guess))
 
 model.summary()
 model.save(name + '.h5')
