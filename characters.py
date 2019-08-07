@@ -11,6 +11,7 @@ Output: 'h' 'e' 'l' 'l' 'o' ' ' 'w' 'o' 'r' 'l' 'd' ' ' ' ' 'F' 'o' 'o' ' ' 'B' 
 from __future__ import print_function
 from keras.models import Sequential
 from keras import layers
+from keras.utils import plot_model
 import numpy as np
 from six.moves import range
 import string
@@ -110,24 +111,46 @@ print('Validation Data:')
 print(x_val.shape)
 print(y_val.shape)
 
-def model_ff():
+BATCH_SIZE = 50
+
+def model_ff1():
     print('Build model...')
+    epochs = 400
     model = Sequential()
     model.add(layers.Dense(len(chars), input_shape=(len(chars), ), activation='softmax'))
-#    model.add(layers.Dense(50, activation='sigmoid'))
-#    model.add(layers.Dense(len(chars), activation='softmax'))
     model.compile(loss='categorical_crossentropy',
                 optimizer='adam',
                 metrics=['accuracy'])
-    return model, 'ff1-400ep.h5'
+    return model, epochs, "ff1-{}b-{}ep".format(BATCH_SIZE, epochs)
 
-model, name = model_ff()
-model.summary()
+def model_ff2():
+    print('Build model...')
+    epochs = 100
+    model = Sequential()
+    model.add(layers.Dense(len(chars), input_shape=(len(chars), )))
+    model.add(layers.Dense(len(chars), activation='softmax'))
+    model.compile(loss='categorical_crossentropy',
+                optimizer='adam',
+                metrics=['accuracy'])
+    return model, epochs, "ff2-{}b-{}ep".format(BATCH_SIZE, epochs)
 
-BATCH_SIZE = 50
+def model_ff3():
+    print('Build model...')
+    epochs = 80
+    model = Sequential()
+    model.add(layers.Dense(len(chars), input_shape=(len(chars), )))
+    model.add(layers.Dense(len(chars)))
+    model.add(layers.Dense(len(chars), activation='softmax'))
+    model.compile(loss='categorical_crossentropy',
+                optimizer='adam',
+                metrics=['accuracy'])
+    return model, epochs, "ff3-{}b-{}ep".format(BATCH_SIZE, epochs)
+
+model, epochs, name = model_ff1()
+
 # Train the model each generation and show predictions against the validation
 # dataset.
-for iteration in range(1, 400):
+for iteration in range(1, epochs):
     print()
     print('-' * 50)
     print('Iteration', iteration)
@@ -147,4 +170,5 @@ for iteration in range(1, 400):
         print('Q', q, '    T', correct, '    G', guess)
 
 model.summary()
-model.save(name)
+model.save(name + '.h5')
+plot_model(model, to_file=name + '.png', show_shapes=True)
