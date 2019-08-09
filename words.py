@@ -125,9 +125,19 @@ ctable = WordTable()
 print(f'Words table with training size {TRAINING_SIZE}, vocab size {VOCAB_SIZE} and sample size {SAMPLE_SIZE}')
 
 
-def line_to_indices(line):
+def line_x_to_indices(line):
     words = line.split()
     return ctable.words_to_indices(words)
+
+def line_y_to_indices(line):
+    pairs = line.split(',')
+    if len(pairs[0]) < 2: # no counts here
+        return list(zip(ctable.words_to_indices(pairs), [1 for _ in range(len(pairs))]))
+    else:
+        words =  [p.split()[0] for p in pairs]
+        counts = [p.split()[1] for p in pairs]
+        w_indices = ctable.words_to_indices(words)
+        return w_indices, counts
 
 def input_generator(nsamples, train=True, forConv=False):
     print('Generating input for ', 'training' if train else 'validation')
@@ -137,10 +147,10 @@ def input_generator(nsamples, train=True, forConv=False):
         x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
         y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.int)
         for line_x, line_y in zip(fx, fy):
-            question = line_to_indices(line_x)
-            expected = line_to_indices(line_y)
+            question = line_x_to_indices(line_x)
+            expected_w, expected_c = line_y_to_indices(line_y)
             x[j] = ctable.encode(question, forConv)
-            y[j][expected] = 1
+            y[j][expected_w] = expected_c
             j = j + 1
             if j % nsamples == 0:
                 yield x, y
