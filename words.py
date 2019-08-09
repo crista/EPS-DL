@@ -14,7 +14,7 @@ from keras.utils import plot_model
 from keras.utils import to_categorical
 import numpy as np
 from six.moves import range
-import string, re, collections, os
+import string, re, collections, os, sys
 
 # Parameters for the model and dataset.
 TRAINING_SIZE = 50000
@@ -23,7 +23,9 @@ SAMPLE_SIZE = 100
 TOP = 2
 BATCH_SIZE = 50
 
-data_folder = 'words_data'
+data_folder = 'words_data' 
+if len(sys.argv) > 1:
+    data_folder = data_folder + '_' + sys.argv[1]
 train_x = os.path.join(data_folder, 'train_x.txt')
 train_y = os.path.join(data_folder, 'train_y.txt')
 val_x = os.path.join(data_folder, 'val_x.txt')
@@ -72,7 +74,7 @@ class WordTable(object):
     def indices_to_words(self, indices):
         return [self.indices_word[i] for i in indices]
 
-    def encode(self, W):
+    def encode(self, W, forConv=False):
         """One-hot encode given word, or list of indices, W.
 
         # Arguments
@@ -83,10 +85,13 @@ class WordTable(object):
             x[self.word_indices[W]] = 1
             return x
         elif type(W) is list: # Example: [3, 9, 5]
-            x = np.zeros((SAMPLE_SIZE, VOCAB_SIZE))
+            x = np.zeros((SAMPLE_SIZE, VOCAB_SIZE))  if not forConv else np.zeros((SAMPLE_SIZE, VOCAB_SIZE, 1))
             for i, w in enumerate(W):
                 if i >= SAMPLE_SIZE: break
-                x[i, w] = 1
+                if not forConv:
+                    x[i, w] = 1 
+                else:
+                    x[i, w, 0] = 1
             return x
         else:
             raise Exception("Bad type to encode")
@@ -123,23 +128,23 @@ def line_to_indices(line):
     words = line.split()
     return ctable.words_to_indices(words)
 
-def input_generator(nsamples, train=True):
+def input_generator(nsamples, train=True, forConv=False):
     print('Generating input for ', 'training' if train else 'validation')
     f_x, f_y = (train_x, train_y) if train else (val_x, val_y)
     with open(f_x) as fx, open(f_y) as fy:
         j = 0
-        x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int)
+        x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
         y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.int)
         for line_x, line_y in zip(fx, fy):
             question = line_to_indices(line_x)
             expected = line_to_indices(line_y)
-            x[j] = ctable.encode(question)
+            x[j] = ctable.encode(question, forConv)
             y[j][expected] = 1
             j = j + 1
             if j % nsamples == 0:
                 yield x, y
                 j = 0
-                x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int)
+                x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
                 y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.int)
         print("End of ", 'training' if train else 'validation')
         return x, y
@@ -163,16 +168,16 @@ def model_ff():
                 metrics=['acc', topcategories])
     return model, epochs, "words-ff2-{}b-{}ep".format(BATCH_SIZE, epochs)
 
-def model_convnet():
+def model_convnet1D():
     print('Build model...')
-    epochs = 50
+    epochs = 100
     model = Sequential()
-    model.add(layers.Conv1D(32, VOCAB_SIZE, activation='relu', 
+    model.add(layers.Conv1D(32, 10, activation='relu', 
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE)))
     model.add(layers.MaxPooling1D(2))
-    model.add(layers.Conv1D(64, VOCAB_SIZE, activation='relu'))
+    model.add(layers.Conv1D(64, 10, activation='relu'))
     model.add(layers.MaxPooling1D(2))
-    model.add(layers.Conv1D(64, VOCAB_SIZE, activation='relu'))
+    model.add(layers.Conv1D(64, 10, activation='relu'))
     model.add(layers.GlobalMaxPooling1D())
     model.add(layers.Dense(VOCAB_SIZE, activation='sigmoid'))
 
@@ -180,22 +185,41 @@ def model_convnet():
                 optimizer='adam',
                 metrics=['acc', topcategories])
     
-    return model, epochs, "words-convnet-{}b-{}ep".format(BATCH_SIZE, epochs)
+    return model, epochs, "words-convnet1D-{}b-{}ep".format(BATCH_SIZE, epochs)
+
+def model_convnet2D():
+    print('Build model...')
+    epochs = 100
+    model = Sequential()
+    model.add(layers.Conv2D(VOCAB_SIZE, (1, VOCAB_SIZE),  
+                input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
+#    model.add(layers.MaxPooling2D((2, 2)))
+#    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
+#    model.add(layers.MaxPooling2D((2, 1)))
+#    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
+    model.add(layers.Flatten())
+    model.add(layers.Dense(VOCAB_SIZE, activation='sigmoid'))
+
+    model.compile(loss='binary_crossentropy',
+                optimizer='adam',
+                metrics=['acc', topcategories])
+    
+    return model, epochs, "words-convnet2D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
 
-model, epochs, name = model_convnet()
+model, epochs, name = model_convnet2D()
 model.summary()
 plot_model(model, to_file=name + '.png', show_shapes=True)
 
 # Train the model each generation and show predictions against the validation
 # dataset.
-val_gen_2 = input_generator(5, False)
+val_gen_2 = input_generator(5, train=False, forConv=True)
 for iteration in range(1, epochs):
     print()
     print('-' * 50)
     print('Iteration', iteration)
-    input_gen = input_generator(BATCH_SIZE)
-    val_gen = input_generator(BATCH_SIZE, False)
+    input_gen = input_generator(BATCH_SIZE, forConv=True)
+    val_gen = input_generator(BATCH_SIZE, False, forConv=True)
     model.fit_generator(input_gen,
                 epochs = 1,
                 steps_per_epoch = 20,
@@ -222,3 +246,4 @@ for iteration in range(1, epochs):
 
 model.summary()
 model.save(name + '.h5')
+
