@@ -198,10 +198,6 @@ def model_convnet2D():
     model.add(layers.Conv2D(VOCAB_SIZE, (1, VOCAB_SIZE),  
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
     model.add(layers.Lambda(SumPooling2D))
-#    model.add(layers.AveragePooling2D((SAMPLE_SIZE, 1)))
-#    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
-#    model.add(layers.MaxPooling2D((2, 1)))
-#    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
     model.add(layers.Flatten())
     model.add(layers.Dense(VOCAB_SIZE, activation='sigmoid'))
 
