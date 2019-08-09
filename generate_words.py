@@ -29,8 +29,8 @@ def generate_pair(with_counts):
             other = words[np.random.randint(0, VOCAB_SIZE/2)]
             query = [other if v == w else v for v in query]
 
-    counts = collections.Counter(w for w in query)
-    top = counts.most_common(TOP)
+    counts = collections.Counter(query)
+    top = counts.most_common()
     if not with_counts:
         ans = list(list(zip(*top))[0])
     else:

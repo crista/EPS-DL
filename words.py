@@ -110,7 +110,7 @@ class WordTable(object):
         if x.ndim == 1: # either a single word, one-hot encoded, or multiple words
             #one_idxs = [i for i, v in enumerate(x) if v >= 0.5]
             one_idxs = np.argpartition(x, -TOP)[-TOP:]
-            print(f'Top 2 indices are {one_idxs} and values are {x[one_idxs]}')
+            print(f'Top 2 indices are {one_idxs} and values are ', x[one_idxs])
             return [self.indices_word[i] for i in one_idxs]
         elif x.ndim == 2: # a list of words, each one-hot encoded
             words = []
@@ -135,9 +135,9 @@ def line_y_to_indices(line):
         return list(zip(ctable.words_to_indices(pairs), [1 for _ in range(len(pairs))]))
     else:
         words =  [p.split()[0] for p in pairs]
-        counts = [p.split()[1] for p in pairs]
+        counts = [int(p.split()[1]) / SAMPLE_SIZE for p in pairs]
         w_indices = ctable.words_to_indices(words)
-        return w_indices, counts
+        return w_indices, counts 
 
 def input_generator(nsamples, train=True, forConv=False):
     print('Generating input for ', 'training' if train else 'validation')
@@ -145,7 +145,7 @@ def input_generator(nsamples, train=True, forConv=False):
     with open(f_x) as fx, open(f_y) as fy:
         j = 0
         x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
-        y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.int)
+        y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float)
         for line_x, line_y in zip(fx, fy):
             question = line_x_to_indices(line_x)
             expected_w, expected_c = line_y_to_indices(line_y)
@@ -156,7 +156,7 @@ def input_generator(nsamples, train=True, forConv=False):
                 yield x, y
                 j = 0
                 x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
-                y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.int)
+                y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float)
         print("End of ", 'training' if train else 'validation')
         return x, y
 
@@ -181,7 +181,7 @@ def model_ff():
 
 def model_convnet1D():
     print('Build model...')
-    epochs = 100
+    epochs = 1
     model = Sequential()
     model.add(layers.Conv1D(32, 10, activation='relu', 
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE)))
