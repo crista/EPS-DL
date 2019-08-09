@@ -10,6 +10,7 @@ Output: [10, 2, 1] (Not necessarily in this order)
 from __future__ import print_function
 from keras.models import Sequential
 from keras import layers, metrics
+from keras import backend as K
 from keras.utils import plot_model
 from keras.utils import to_categorical
 import numpy as np
@@ -187,13 +188,17 @@ def model_convnet1D():
     
     return model, epochs, "words-convnet1D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
+def SumPooling2D(x):
+    return K.sum(x, axis=1)
+
 def model_convnet2D():
     print('Build model...')
     epochs = 100
     model = Sequential()
     model.add(layers.Conv2D(VOCAB_SIZE, (1, VOCAB_SIZE),  
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
-#    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Lambda(SumPooling2D))
+#    model.add(layers.AveragePooling2D((SAMPLE_SIZE, 1)))
 #    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
 #    model.add(layers.MaxPooling2D((2, 1)))
 #    model.add(layers.Conv2D(64, (5, 1), activation='relu'))
