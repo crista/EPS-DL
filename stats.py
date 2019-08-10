@@ -35,5 +35,8 @@ print('Max words in a line: ', max_words)
 print('Max chars in a line: ', max_chars)
 print('Unique words: ', len(wf))
 print("Top 30:")
-for (w, c) in counts.most_common(30):
+i = 0
+sorted_wf = [(k, wf[k]) for k in sorted(wf, key=wf.get, reverse=True)]
+for w, c in sorted_wf[:30]:
     print(w, '-', c)
+    i = i + 1
