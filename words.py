@@ -48,6 +48,7 @@ class WordTable(object):
         global TRAINING_SIZE
         global VOCAB_SIZE
         global SAMPLE_SIZE
+        global BATCH_SIZE
 
         self.words = set()
         nlines = 0
@@ -68,6 +69,7 @@ class WordTable(object):
         TRAINING_SIZE = nlines
         VOCAB_SIZE = len(self.words)
         SAMPLE_SIZE = max_words
+        BATCH_SIZE = 50
 
     def words_to_indices(self, words):
         return [self.word_indices[w] for w in words]
@@ -122,7 +124,7 @@ class WordTable(object):
 
 
 ctable = WordTable()
-print(f'Words table with training size {TRAINING_SIZE}, vocab size {VOCAB_SIZE} and sample size {SAMPLE_SIZE}')
+print(f'Words table with training size {TRAINING_SIZE}, batch size {BATCH_SIZE}, vocab size {VOCAB_SIZE} and sample size {SAMPLE_SIZE}')
 
 
 def line_x_to_indices(line):
@@ -145,7 +147,7 @@ def input_generator(nsamples, train=True, forConv=False):
     with open(f_x) as fx, open(f_y) as fy:
         j = 0
         x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
-        y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float)
+        y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float64)
         for line_x, line_y in zip(fx, fy):
             question = line_x_to_indices(line_x)
             expected_w, expected_c = line_y_to_indices(line_y)
@@ -156,7 +158,7 @@ def input_generator(nsamples, train=True, forConv=False):
                 yield x, y
                 j = 0
                 x = np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE), dtype=np.int) if not forConv else np.zeros((nsamples, SAMPLE_SIZE, VOCAB_SIZE, 1), dtype=np.int)
-                y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float)
+                y = np.zeros((nsamples, VOCAB_SIZE), dtype=np.float64)
         print("End of ", 'training' if train else 'validation')
         return x, y
 
@@ -199,7 +201,7 @@ def model_convnet1D():
     return model, epochs, "words-convnet1D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
 def SumPooling2D(x):
-    return K.sum(x, axis=1)
+    return K.sum(x, axis=1) / SAMPLE_SIZE
 
 def model_convnet2D():
     print('Build model...')
@@ -209,7 +211,7 @@ def model_convnet2D():
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
     model.add(layers.Lambda(SumPooling2D))
     model.add(layers.Flatten())
-    model.add(layers.Dense(VOCAB_SIZE, activation='sigmoid'))
+    model.add(layers.Dense(VOCAB_SIZE))
 
     model.compile(loss='binary_crossentropy',
                 optimizer='adam',
