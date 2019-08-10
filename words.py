@@ -77,7 +77,7 @@ class WordTable(object):
     def indices_to_words(self, indices):
         return [self.indices_word[i] for i in indices]
 
-    def encode(self, W, forConv=False):
+    def encode_one_hot(self, W, forConv=False):
         """One-hot encode given word, or list of indices, W.
 
         # Arguments
@@ -151,7 +151,7 @@ def input_generator(nsamples, train=True, forConv=False):
         for line_x, line_y in zip(fx, fy):
             question = line_x_to_indices(line_x)
             expected_w, expected_c = line_y_to_indices(line_y)
-            x[j] = ctable.encode(question, forConv)
+            x[j] = ctable.encode_one_hot(question, forConv)
             y[j][expected_w] = expected_c
             j = j + 1
             if j % nsamples == 0:
@@ -162,8 +162,8 @@ def input_generator(nsamples, train=True, forConv=False):
         print("End of ", 'training' if train else 'validation')
         return x, y
 
-def topcategories(x, y):
-    return metrics.top_k_categorical_accuracy(x, y, k=TOP)
+def topcats(y_true, y_pred):
+    return metrics.top_k_categorical_accuracy(y_true, y_pred, k=TOP)
 
 def model_ff():
     print('Build model...')
@@ -178,7 +178,7 @@ def model_ff():
     model.add(layers.Dense(VOCAB_SIZE, activation='sigmoid'))
     model.compile(loss='binary_crossentropy',
                 optimizer='adam',
-                metrics=['acc', topcategories])
+                metrics=['acc', topcats])
     return model, epochs, "words-ff2-{}b-{}ep".format(BATCH_SIZE, epochs)
 
 def model_convnet1D():
@@ -196,7 +196,7 @@ def model_convnet1D():
 
     model.compile(loss='binary_crossentropy',
                 optimizer='adam',
-                metrics=['acc', topcategories])
+                metrics=['acc', topcats])
     
     return model, epochs, "words-convnet1D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
@@ -205,18 +205,23 @@ def SumPooling2D(x):
 
 def model_convnet2D():
     print('Build model...')
-    epochs = 100
+    epochs = 200
     model = Sequential()
     model.add(layers.Conv2D(VOCAB_SIZE, (1, VOCAB_SIZE),  
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
     model.add(layers.Lambda(SumPooling2D))
-    model.add(layers.Flatten())
-    model.add(layers.Dense(VOCAB_SIZE))
+    model.add(layers.Reshape((VOCAB_SIZE,)))
+    #    model.add(layers.Flatten())
+#    model.add(layers.Dense(VOCAB_SIZE))
 
-    model.compile(loss='binary_crossentropy',
+    model.compile(loss='mean_squared_error',
                 optimizer='adam',
-                metrics=['acc', topcategories])
+                metrics=['acc', topcats])
     
+#    model.compile(loss='binary_crossentropy',
+#    optimizer='adam',
+#    metrics=['acc', topcategories])
+
     return model, epochs, "words-convnet2D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
 
