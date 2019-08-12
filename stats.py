@@ -6,7 +6,7 @@ with open(sys.argv[1]) as f:
 lines = [x.strip() for x in lines]
 nwords = 0
 n_non_stop_words = 0
-max_words = max_chars = 0
+max_words = max_chars = max_char_len = 0
 i = 0
 wf = {}
 for line in lines:
@@ -15,6 +15,10 @@ for line in lines:
     ws = re.findall('[a-z]{2,}', line.lower())
     max_words = max(max_words, len(ws))
     max_chars = max(max_chars, len(line))
+    if ws != []:
+        x = len(max(ws, key=len))
+        if x > max_char_len:
+            max_char_len = x
     non_stop_words = [w for w in ws if w not in stopwords]
     counts = collections.Counter(non_stop_words)
     for w, c in counts.items():
@@ -33,6 +37,7 @@ print('Total words: ', nwords)
 print('Total non-stop words: ', len(non_stop_words))
 print('Max words in a line: ', max_words)
 print('Max chars in a line: ', max_chars)
+print('Max chars length: ', max_char_len)
 print('Unique words: ', len(wf))
 print("Top 30:")
 i = 0
