@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
 # An implementation of deep learning for counting symbols
-E.g. with N = 2
 Input:  [10, 12, 10, 11, 2, 2, 2, 1, 1]
 Output: words=[2, 10, 1, 12, 11] counts=[3, 2, 2, 1, 1] (Not necessarily in this order)
 
