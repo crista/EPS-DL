@@ -112,7 +112,7 @@ class WordTable(object):
         if x.ndim == 1: # either a single word, one-hot encoded, or multiple words
             #one_idxs = [i for i, v in enumerate(x) if v >= 0.5]
             one_idxs = np.argpartition(x, -TOP)[-TOP:]
-            print(f'Top 2 indices are {one_idxs} and values are ', x[one_idxs])
+            print(f'Top 2 indices are {one_idxs} and values are ', np.rint(x[one_idxs]))
             return [self.indices_word[i] for i in one_idxs]
         elif x.ndim == 2: # a list of words, each one-hot encoded
             words = []
@@ -137,7 +137,7 @@ def line_y_to_indices(line):
         return list(zip(ctable.words_to_indices(pairs), [1 for _ in range(len(pairs))]))
     else:
         words =  [p.split()[0] for p in pairs]
-        counts = [int(p.split()[1]) / SAMPLE_SIZE for p in pairs]
+        counts = [int(p.split()[1]) for p in pairs] 
         w_indices = ctable.words_to_indices(words)
         return w_indices, counts 
 
@@ -201,11 +201,11 @@ def model_convnet1D():
     return model, epochs, "words-convnet1D-{}b-{}ep".format(BATCH_SIZE, epochs)
 
 def SumPooling2D(x):
-    return K.sum(x, axis=1) / SAMPLE_SIZE
+    return K.sum(x, axis=1) 
 
 def model_convnet2D():
     print('Build model...')
-    epochs = 200
+    epochs = 150
     model = Sequential()
     model.add(layers.Conv2D(VOCAB_SIZE, (1, VOCAB_SIZE),  
                 input_shape=(SAMPLE_SIZE, VOCAB_SIZE, 1)))
