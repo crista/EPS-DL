@@ -111,7 +111,7 @@ class WordTable(object):
             x = np.zeros((SAMPLE_SIZE, BIN_SIZE, 1))
             for i, w in enumerate(W):
                 if i >= SAMPLE_SIZE: break
-                for n in range(8): 
+                for n in range(BIN_SIZE): 
                     n2 = pow(2, n)
                     x[i, n, 0] = 1 if (w & n2) == n2 else 0
             return x
