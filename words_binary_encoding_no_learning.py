@@ -193,21 +193,25 @@ def set_weights(clayer):
     for i in range(VOCAB_SIZE):
         slice_1 = w[0, :, 0, i]
         n_ones = len(slice_1[ slice_1 == 1 ])
-        if n_ones > 0: slice_1[ slice_1 == 1 ] = 1./n_ones  
+        if n_ones > 0: slice_1[ slice_1 == 1 ] = 1./n_ones 
     wb.append(w)
     wb.append(b)
     clayer.set_weights(wb)
 
+def Max(x):
+    zeros = K.zeros_like(x)
+    return K.switch(K.less(x, 0.9), zeros, x)
+
 def SumPooling2D(x):
-    s = K.sum(x, axis=1) 
-    return s
+    return K.sum(x, axis = 1)
 
 def model_convnet2D():
     print('Build model...')
     model = Sequential()
     model.add(layers.Conv2D(VOCAB_SIZE, (1, BIN_SIZE),  input_shape=(SAMPLE_SIZE, BIN_SIZE, 1)))
     set_weights(model.layers[0])
-    model.add(layers.ReLU(threshold=1-1/BIN_SIZE))
+#    model.add(layers.ReLU(threshold=1-1/BIN_SIZE))
+    model.add(layers.Lambda(Max))
     model.add(layers.Lambda(SumPooling2D))
     model.add(layers.Reshape((VOCAB_SIZE,)))
 
