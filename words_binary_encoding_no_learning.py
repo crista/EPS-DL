@@ -189,11 +189,13 @@ def set_weights(clayer):
     for i in range(VOCAB_SIZE):
         for n in range(BIN_SIZE):
             n2 = pow(2, n)
-            w[0][n][0][i] = 1 if (i & n2) == n2 else -(BIN_SIZE-1)
+            w[0][n][0][i] = 1 if (i & n2) == n2 else -1 #-(BIN_SIZE-1)
     for i in range(VOCAB_SIZE):
         slice_1 = w[0, :, 0, i]
         n_ones = len(slice_1[ slice_1 == 1 ])
         if n_ones > 0: slice_1[ slice_1 == 1 ] = 1./n_ones 
+    # Scale the whole thing down one order of magnitude
+    #w = w * 0.1
     wb.append(w)
     wb.append(b)
     clayer.set_weights(wb)
@@ -203,7 +205,7 @@ def Max(x):
     return K.switch(K.less(x, 0.9), zeros, x)
 
 def SumPooling2D(x):
-    return K.sum(x, axis = 1)
+    return K.sum(x, axis = 1) 
 
 def model_convnet2D():
     print('Build model...')
@@ -236,4 +238,7 @@ for i in range(len(batch_x)):
     correct = ctable.decode(expected)
     guess = ctable.decode(prediction)
     print('T', correct, '    G', guess)
+
+w, b = model.layers[0].get_weights()
+print(w[0,0,0])
 
