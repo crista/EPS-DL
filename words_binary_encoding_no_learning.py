@@ -194,6 +194,8 @@ def set_weights(clayer):
         slice_1 = w[0, :, 0, i]
         n_ones = len(slice_1[ slice_1 == 1 ])
         if n_ones > 0: slice_1[ slice_1 == 1 ] = 1./n_ones 
+        n_ones = len(slice_1[ slice_1 == -1 ])
+        if n_ones > 0: slice_1[ slice_1 == -1 ] = -1./n_ones 
     # Scale the whole thing down one order of magnitude
     #w = w * 0.1
     wb.append(w)
@@ -204,6 +206,16 @@ def Max(x):
     zeros = K.zeros_like(x)
     return K.switch(K.less(x, 0.9), zeros, x)
 
+def sigmoid_steep(x):
+    base = K.ones_like(x) * pow(10, 20)
+    return 1. / (1. + K.pow(base, -x))
+
+def Max2(x):
+    return sigmoid_steep(x - (1-1/BIN_SIZE))  * x
+
+def Reduce(x):
+    return K.pow(x, 15)
+
 def SumPooling2D(x):
     return K.sum(x, axis = 1) 
 
@@ -212,8 +224,10 @@ def model_convnet2D():
     model = Sequential()
     model.add(layers.Conv2D(VOCAB_SIZE, (1, BIN_SIZE),  input_shape=(SAMPLE_SIZE, BIN_SIZE, 1)))
     set_weights(model.layers[0])
-#    model.add(layers.ReLU(threshold=1-1/BIN_SIZE))
-    model.add(layers.Lambda(Max))
+    model.add(layers.ReLU(threshold=1-1/BIN_SIZE))
+#    model.add(layers.Lambda(Max))
+#    model.add(layers.Lambda(Max2))
+#    model.add(layers.Lambda(Reduce))
     model.add(layers.Lambda(SumPooling2D))
     model.add(layers.Reshape((VOCAB_SIZE,)))
 
@@ -240,5 +254,6 @@ for i in range(len(batch_x)):
     print('T', correct, '    G', guess)
 
 w, b = model.layers[0].get_weights()
-print(w[0,0,0])
+#print(w[0,0,0])
+print(preds[0][:][0][:])
 
