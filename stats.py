@@ -34,7 +34,7 @@ nlines = len(lines)
 
 print('Number of lines: ', nlines)
 print('Total words: ', nwords)
-print('Total non-stop words: ', len(non_stop_words))
+print('Total non-stop words: ', n_non_stop_words)
 print('Max words in a line: ', max_words)
 print('Max chars in a line: ', max_chars)
 print('Max chars length: ', max_char_len)
