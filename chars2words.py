@@ -332,9 +332,8 @@ def decode_sequence(input_seq):
 
         # Exit condition: either hit max length
         # or find stop character.
-        if (sampled_word == '@end@' or
-           len(decoded_sentence) > OUTPUT_SIZE):
-            stop_condition = True
+        if (sampled_word == '@end@' or len(decoded_sentence) > OUTPUT_SIZE):
+           stop_condition = True
 
         # Update the target sequence (of length 1).
         target_seq = np.zeros((1, 1, OUTPUT_VOCAB_SIZE))
@@ -345,9 +344,9 @@ def decode_sequence(input_seq):
 
     return decoded_sentence
 
-val_gen_2 = input_generator(10, False)
+val_gen_2 = input_generator(50, False)
 [batch_encoder_input, batch_decoder_input], batch_decoder_target = next(val_gen_2)
-for seq_index in range(10):
+for seq_index in range(50):
     # Take one sequence (part of the training set)
     # for trying out decoding.
     input_seq = batch_encoder_input[seq_index : seq_index + 1]
