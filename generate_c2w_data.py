@@ -1,13 +1,7 @@
 import os, sys
 import collections
 import numpy as np
-import re
-
-data_folder = 'c2w_data'
-train_x = os.path.join(data_folder, 'train_x.txt')
-train_y = os.path.join(data_folder, 'train_y.txt')
-val_x = os.path.join(data_folder, 'val_x.txt')
-val_y = os.path.join(data_folder, 'val_y.txt')
+import re, string
 
 MAX_LINE_SIZE = 80
 MAX_WORDS_IN_LINE = 20
@@ -39,12 +33,13 @@ def generate_pair():
         cquery = cquery[:last_sp] + ' ' * (MAX_LINE_SIZE - last_sp)
 
     # OK, now that we have the sequence of chars, find its sequence of words
+    # [TODO] Remember to remove stop words
     list_of_words = re.findall('[a-z]{2,}', cquery.lower())
 
     return cquery.strip(), list_of_words
 
 
-def generate_data(ntrain, nval, vocab_size):
+def generate_data(ntrain, nval, vocab_size, data_folder, train_x, train_y, val_x, val_y):
     if not os.path.exists(data_folder):
         os.makedirs(data_folder)
 
@@ -66,7 +61,13 @@ def main():
     # [1]: number of samples in training set
     # [2]: number of samples in validation set
     # [3]: vocabulary size
-    generate_data(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]))
+    data_folder = 'c2w_data'
+    if len(sys.argv) > 3: data_folder = data_folder + "_" + sys.argv[3]
+    train_x = os.path.join(data_folder, 'train_x.txt')
+    train_y = os.path.join(data_folder, 'train_y.txt')
+    val_x = os.path.join(data_folder, 'val_x.txt')
+    val_y = os.path.join(data_folder, 'val_y.txt')
+    generate_data(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), data_folder, train_x, train_y, val_x, val_y)
 
 if __name__ == "__main__":
     main()
