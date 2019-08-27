@@ -19,6 +19,7 @@ INPUT_SIZE = 100
 OUTPUT_SIZE = 100
 MAX_WORD_SIZE = 20
 INPUT_VOCAB_SIZE = 80
+BATCH_SIZE = 2
 
 file = 'pride-and-prejudice.txt' 
 if len(sys.argv) > 1:
@@ -57,17 +58,20 @@ class SymbolTable(object):
     def encode_one_hot(self, S, typ="char"):
         """One-hot encode given a list of character indices, C.
         """
-        if typ == "char":
-            x = np.zeros((INPUT_SIZE, INPUT_VOCAB_SIZE))  
-            for i, s in enumerate(S):
-                x[i, s] = 1 
+        if typ == "char": # Return a list of arrays
+            all = []
+            for s in S:
+                x = np.zeros((INPUT_VOCAB_SIZE)) 
+                x[s] = 1 
+                all.append(x)
+            return all
         else:
             x = np.zeros((OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
             for i, w in enumerate(S):
                 for j, c in enumerate(w):
                     idx = self.char_indices[c]
                     x[i, j, idx] = 1
-        return x
+            return x
 
     def decode(self, x):
         """Decode the given vector or 1D array to their symbolic output.
@@ -82,7 +86,7 @@ class SymbolTable(object):
         elif x.ndim == 1: # either a single symbol, one-hot encoded, or multiple symbols
             #one_idxs = [i for i, v in enumerate(x) if v >= 0.5]
             one_idx = np.argmax(x)
-#            print(f'Top index is {one_idx} and value is ', x[one_idx])
+            #print(f'Top index is {one_idx} and value is ', x[one_idx])
             return self.indices_char[one_idx]
         elif x.ndim == 2: # a list of symbols, each one-hot encoded
             return ''.join([self.decode(c) for c in x])
@@ -108,26 +112,69 @@ ctable = SymbolTable()
 print('Number of unique input tokens:', INPUT_VOCAB_SIZE)
 print('Max sequence length for inputs:', INPUT_SIZE)
 print('Max sequence length for outputs:', OUTPUT_SIZE)
+print('Max word size:', MAX_WORD_SIZE)
 
 def normalization_layer_set_weights(n_layer):
     wb = []
     b = np.zeros((INPUT_VOCAB_SIZE), dtype=np.float32)
     w = np.zeros((INPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE), dtype=np.float32)
+    # Let lower case letters go through
     for c in string.ascii_lowercase:
         i = ctable.char_indices[c]
         w[i, i] = 1
-    # Change capitals to lower case
+    # Map capitals to lower case
     for c in string.ascii_uppercase:
         i = ctable.char_indices[c]
         il = ctable.char_indices[c.lower()]
         w[i, il] = 1
+    # Map all non-letters to space
+    sp_idx = ctable.char_indices[' ']
+    for c in [c for c in list(string.printable) if c not in list(string.ascii_letters)]:
+        i = ctable.char_indices[c]
+        w[i, sp_idx] = 1
+
     wb.append(w)
     wb.append(b)
     n_layer.set_weights(wb)
     return n_layer
 
+
+def SpaceDetector(x):
+#    print("x-sh", x.shape)
+#    print("input: ", K.eval(x))
+
+    sp_idx = 0
+    sp = np.zeros((INPUT_VOCAB_SIZE))
+    sp[sp_idx] = 1
+
+    filtered = x * sp
+#    print("filtered:", K.eval(filtered))
+    sp_positions = K.tf.where(K.tf.equal(filtered, 1)) # row indices
+#    print("sp-p:", K.eval(sp_positions))
+
+    starts = K.eval(sp_positions[:-1]) + [0, 1, 0] #[1, 0]
+    stops = K.eval(sp_positions[1:]) + [0, 0, INPUT_VOCAB_SIZE] #[0, INPUT_VOCAB_SIZE])
+    sizes = stops - starts + [[1, 0, 0] for s in starts]
+    starts = starts[sizes[:, 0] == 1] # Remove multi-sample rows
+    sizes = sizes[sizes[:, 0] == 1] # Same
+    starts = starts[sizes[:, 1] > 0] # Remove words with 0 length (consecutive spaces)
+    sizes = sizes[sizes[:, 1] > 0] # Same
+
+    print("starts:", starts, "sh:", starts.shape)
+    print("stops:", stops)
+    print("sizes:", sizes, "sh:", sizes.shape)
+
+    slices = [K.slice(x, i, j) for i, j in zip(starts, sizes)]
+    slices_padded = [K.tf.pad(s, [[0,0], [0, MAX_WORD_SIZE - size], [0,0]], "CONSTANT") for s, size in zip(slices, sizes[:,1])]
+    words = K.variable(slices_padded)
+ #   print("words:", K.eval(words))
+    return words
+
+
 def build_model():
     print('Build model...')
+    
+    # Normalize every character in the input, using a shared dense model
     n_layer = Dense(INPUT_VOCAB_SIZE)
     raw_inputs = []
     normalized_outputs = []
@@ -140,29 +187,45 @@ def build_model():
 
     merged_output = layers.concatenate(normalized_outputs, axis=-1)
 
-    model = Model(inputs=raw_inputs, outputs=normalized_outputs)
+    reshape = layers.Reshape((INPUT_SIZE, INPUT_VOCAB_SIZE, ))
+    reshaped_output = reshape(merged_output)
+
+    # Find the space characters
+    c2w = layers.Lambda(SpaceDetector, output_shape=(None, OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
+    words_output = c2w(reshaped_output)
+
+    model = Model(inputs=raw_inputs, outputs=words_output)
 
     return model
 
 
 model = build_model()
-model.summary()
+#model.summary()
 plot_model(model, to_file='tf-no-learning.png', show_shapes=True)
 with open(file) as f:
-    for line in f:
-        onehot = ctable.encode_one_hot(ctable.to_indices(list(line)))
-        inputs = []
-        for a in onehot:
-            x = np.zeros((1, INPUT_VOCAB_SIZE))
-            x[0] = a
-            inputs.append(x)
+    lines = f.readlines()
 
-        preds = model.predict(inputs, batch_size=1)
-        print(len(preds))
-        print("Input:", ctable.decode(onehot))
-        print("Output-raw:", preds[:2])
-        print("Output:", ctable.decode(preds))
-        raise Exception("foo")
+inputs = []
+for i in range(INPUT_SIZE):
+    inputs.append(np.zeros((BATCH_SIZE, INPUT_VOCAB_SIZE))) 
+for n, line in enumerate(lines[0:BATCH_SIZE]):
+    onehots = ctable.encode_one_hot(ctable.to_indices(list(line.strip())))
+    if len(onehots) < 1: continue
+    for i, c in enumerate(onehots):
+        inputs[i][n][:] = c
+    print("here:", ctable.decode(inputs[0][0]), ctable.decode(inputs[1][0]), ctable.decode(inputs[2][0]))
+
+preds = model.predict(inputs, batch_size=BATCH_SIZE, verbose=True)
+
+#print(inputs)
+for n in range(len(preds)):
+    print("@", ctable.decode([inputs[0][0], inputs[1][0]]))
+    print("ins=", len(inputs), "preds=", len(preds))
+    orig = [inputs[i][n] for i in range(INPUT_SIZE)]
+    print("Input:", ctable.decode(orig))
+    print("Output-raw:", preds[n])
+    print(preds[n][preds[n] > 0])
+    print("Output:", ctable.decode(preds[n]))
 #        wf = count_words(onehot)
 #        for w, f in wf.items():
 #            print(w, "-", f)
