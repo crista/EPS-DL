@@ -19,7 +19,7 @@ INPUT_SIZE = 100
 OUTPUT_SIZE = 100
 MAX_WORD_SIZE = 20
 INPUT_VOCAB_SIZE = 80
-BATCH_SIZE = 5
+BATCH_SIZE = 3
 
 file = 'pride-and-prejudice.txt' 
 if len(sys.argv) > 1:
@@ -140,35 +140,35 @@ def normalization_layer_set_weights(n_layer):
 
 
 def SpaceDetector(x):
-#    print("x-sh", x.shape)
+    print("x-sh", x.shape)
 #    print("input: ", K.eval(x))
 
-    sp_idx = 0
+    sp_idx = ctable.char_indices[' ']
     sp = np.zeros((INPUT_VOCAB_SIZE))
     sp[sp_idx] = 1
 
     filtered = x * sp
 #    print("filtered:", K.eval(filtered))
     sp_positions = K.tf.where(K.tf.equal(filtered, 1)) # row indices
+    print(sp_positions.shape)
 #    print("sp-p:", K.eval(sp_positions))
 
-    starts = K.eval(sp_positions[:-1]) + [0, 1, 0] #[1, 0]
-    stops = K.eval(sp_positions[1:]) + [0, 0, INPUT_VOCAB_SIZE] #[0, INPUT_VOCAB_SIZE])
-    sizes = stops - starts + [[1, 0, 0] for s in starts]
-    starts = starts[sizes[:, 0] == 1] # Remove multi-sample rows
-    sizes = sizes[sizes[:, 0] == 1] # Same
-    starts = starts[sizes[:, 1] > 0] # Remove words with 0 length (consecutive spaces)
-    sizes = sizes[sizes[:, 1] > 0] # Same
+    starts = sp_positions[:-1] + [0, 1, 0]
+    stops = sp_positions[1:] + [0, 0, INPUT_VOCAB_SIZE]
+    sizes = stops - starts + [1, 0, 0]
+    where = K.tf.equal(sizes[:, 0], 1)
+    starts = K.tf.boolean_mask(starts, where) # Remove multi-sample rows
+    sizes = K.tf.boolean_mask(sizes, where) # Same
+    where = K.tf.greater(sizes[:, 1], 0)
+    starts = K.tf.boolean_mask(starts, where) # Remove words with 0 length (consecutive spaces)
+    sizes = K.tf.boolean_mask(sizes, where) # Same
 
     print("starts:", starts, "sh:", starts.shape)
     print("stops:", stops)
     print("sizes:", sizes, "sh:", sizes.shape)
 
-    slices = [K.slice(x, i, j) for i, j in zip(starts, sizes)]
-    slices_padded = [K.tf.pad(s, [[0,0], [0, MAX_WORD_SIZE - size], [0,0]], "CONSTANT") for s, size in zip(slices, sizes[:,1])]
-    words = K.variable(slices_padded)
- #   print("words:", K.eval(words))
-    return words
+    slices = K.map_fn(lambda info: K.tf.pad(K.squeeze(K.slice(x, info[0], info[1]), 0), [[0, MAX_WORD_SIZE - info[1][1]], [0,0]], "CONSTANT"), [starts, sizes], dtype=float)
+    return slices
 
 
 def build_model():
@@ -179,6 +179,7 @@ def build_model():
     raw_inputs = []
     normalized_outputs = []
     for _ in range(0, INPUT_SIZE):
+#        input_char = Input(shape=(INPUT_VOCAB_SIZE, ))
         input_char = Input(shape=(INPUT_VOCAB_SIZE, ))
         filtered_char = n_layer(input_char)
         raw_inputs.append(input_char)
@@ -191,13 +192,11 @@ def build_model():
     reshaped_output = reshape(merged_output)
 
     # Find the space characters
-#    c2w = layers.Lambda(SpaceDetector, output_shape=(None, OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
-#    words_output = c2w(reshaped_output)
+    words_output = layers.Lambda(SpaceDetector)(reshaped_output)
 
-    model = Model(inputs=raw_inputs, outputs=reshaped_output)
+    model = Model(inputs=raw_inputs, outputs=words_output)
 
     return model
-
 
 model = build_model()
 #model.summary()
@@ -213,9 +212,10 @@ for n, line in enumerate(lines[0:BATCH_SIZE]):
     if len(onehots) < 1: continue
     for i, c in enumerate(onehots):
         inputs[i][n][:] = c
-    print("here:", ctable.decode(inputs[0][0]), ctable.decode(inputs[1][0]), ctable.decode(inputs[2][0]))
 
-preds = model.predict(inputs, batch_size=BATCH_SIZE, verbose=True)
+print("Move to predict...")
+preds = model.predict(inputs, verbose=True)
+print("End")
 
 #print(inputs)
 for n in range(len(preds)):
