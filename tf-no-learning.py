@@ -19,7 +19,7 @@ INPUT_SIZE = 100
 OUTPUT_SIZE = 100
 MAX_WORD_SIZE = 20
 INPUT_VOCAB_SIZE = 80
-BATCH_SIZE = 2
+BATCH_SIZE = 5
 
 file = 'pride-and-prejudice.txt' 
 if len(sys.argv) > 1:
@@ -191,10 +191,10 @@ def build_model():
     reshaped_output = reshape(merged_output)
 
     # Find the space characters
-    c2w = layers.Lambda(SpaceDetector, output_shape=(None, OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
-    words_output = c2w(reshaped_output)
+#    c2w = layers.Lambda(SpaceDetector, output_shape=(None, OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
+#    words_output = c2w(reshaped_output)
 
-    model = Model(inputs=raw_inputs, outputs=words_output)
+    model = Model(inputs=raw_inputs, outputs=reshaped_output)
 
     return model
 
@@ -209,7 +209,7 @@ inputs = []
 for i in range(INPUT_SIZE):
     inputs.append(np.zeros((BATCH_SIZE, INPUT_VOCAB_SIZE))) 
 for n, line in enumerate(lines[0:BATCH_SIZE]):
-    onehots = ctable.encode_one_hot(ctable.to_indices(list(line.strip())))
+    onehots = ctable.encode_one_hot(ctable.to_indices(list(' ' + line.strip() + ' ')))
     if len(onehots) < 1: continue
     for i, c in enumerate(onehots):
         inputs[i][n][:] = c
