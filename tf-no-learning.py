@@ -219,12 +219,11 @@ preds = model.predict(inputs, batch_size=BATCH_SIZE, verbose=True)
 
 #print(inputs)
 for n in range(len(preds)):
-    print("@", ctable.decode([inputs[0][0], inputs[1][0]]))
-    print("ins=", len(inputs), "preds=", len(preds))
+  #  print("@", ctable.decode([inputs[0][0], inputs[1][0]]))
+ #   print("ins=", len(inputs), "preds=", len(preds))
     orig = [inputs[i][n] for i in range(INPUT_SIZE)]
     print("Input:", ctable.decode(orig))
-    print("Output-raw:", preds[n])
-    print(preds[n][preds[n] > 0])
+#    print("Output-raw:", preds[n])
     print("Output:", ctable.decode(preds[n]))
 #        wf = count_words(onehot)
 #        for w, f in wf.items():
