@@ -16,7 +16,8 @@ import numpy as np
 import sys, os, string
 
 INPUT_SIZE = 100
-OUTPUT_SIZE = 100
+MAX_WORDS_PER_SAMPLE = 100
+MAX_WORDS=1000
 MAX_WORD_SIZE = 20
 INPUT_VOCAB_SIZE = 80
 BATCH_SIZE = 3
@@ -35,7 +36,7 @@ class SymbolTable(object):
         # Arguments
             filename: The file from which to map the words.
         """
-        global INPUT_SIZE, OUTPUT_SIZE, INPUT_VOCAB_SIZE
+        global INPUT_SIZE, MAX_WORDS_PER_SAMPLE, INPUT_VOCAB_SIZE
         # Input symbols
         self.characters = sorted(string.printable)
         self.char_indices = dict((c, i) for i, c in enumerate(self.characters))
@@ -46,7 +47,7 @@ class SymbolTable(object):
                 if len(line) > max_chars: max_chars = len(line)
 
         INPUT_SIZE = max_chars
-        OUTPUT_SIZE = int(max_chars/2)
+        MAX_WORDS_PER_SAMPLE = int(max_chars/2)
         INPUT_VOCAB_SIZE = len(self.characters)
 
     def to_indices(self, symbols):
@@ -66,7 +67,7 @@ class SymbolTable(object):
                 all.append(x)
             return all
         else:
-            x = np.zeros((OUTPUT_SIZE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
+            x = np.zeros((MAX_WORDS_PER_SAMPLE, MAX_WORD_SIZE, INPUT_VOCAB_SIZE))
             for i, w in enumerate(S):
                 for j, c in enumerate(w):
                     idx = self.char_indices[c]
@@ -111,7 +112,7 @@ ctable = SymbolTable()
 
 print('Number of unique input tokens:', INPUT_VOCAB_SIZE)
 print('Max sequence length for inputs:', INPUT_SIZE)
-print('Max sequence length for outputs:', OUTPUT_SIZE)
+print('Max sequence length for outputs:', MAX_WORDS_PER_SAMPLE)
 print('Max word size:', MAX_WORD_SIZE)
 
 def normalization_layer_set_weights(n_layer):
@@ -138,6 +139,8 @@ def normalization_layer_set_weights(n_layer):
     n_layer.set_weights(wb)
     return n_layer
 
+def SpaceDetectorOutputShape(input_shape):
+    return tuple([None, MAX_WORD_SIZE, input_shape[2]])
 
 def SpaceDetector(x):
     print("x-sh", x.shape)
@@ -192,7 +195,7 @@ def build_model():
     reshaped_output = reshape(merged_output)
 
     # Find the space characters
-    words_output = layers.Lambda(SpaceDetector)(reshaped_output)
+    words_output = layers.Lambda(SpaceDetector, output_shape=SpaceDetectorOutputShape)(reshaped_output)
 
     model = Model(inputs=raw_inputs, outputs=words_output)
 
@@ -204,17 +207,24 @@ plot_model(model, to_file='tf-no-learning.png', show_shapes=True)
 with open(file) as f:
     lines = f.readlines()
 
-inputs = []
-for i in range(INPUT_SIZE):
-    inputs.append(np.zeros((BATCH_SIZE, INPUT_VOCAB_SIZE))) 
-for n, line in enumerate(lines[0:BATCH_SIZE]):
+data = [[] for _ in range(INPUT_SIZE)]
+for line in lines[0:BATCH_SIZE]:
+    if line.isspace(): continue
     onehots = ctable.encode_one_hot(ctable.to_indices(list(' ' + line.strip() + ' ')))
-    if len(onehots) < 1: continue
     for i, c in enumerate(onehots):
-        inputs[i][n][:] = c
+        data[i].append(c)
+    for j in range(len(onehots), INPUT_SIZE):
+        data[j].append(np.zeros((INPUT_VOCAB_SIZE)))
+
+inputs = [np.array(e) for e in data]
+print("input.sh:", inputs[0].shape)
+for n in range(len(data[0])):
+#    for i in range(len(data)):
+#        print("c:", i, ctable.decode(inputs[i][n]))
+    print(''.join([ctable.decode(inputs[i][n]) for i in range(len(data))]))
 
 print("Move to predict...")
-preds = model.predict(inputs, verbose=True)
+preds = model.predict(inputs, steps=1)
 print("End")
 
 #print(inputs)
